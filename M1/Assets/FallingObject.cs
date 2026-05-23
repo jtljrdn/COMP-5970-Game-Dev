@@ -3,14 +3,16 @@ using UnityEngine;
 public class FallingObject : MonoBehaviour
 {
 
-    float fallSpeed = 5f;
+    float fallSpeed;
 
     float destroyY = -6f;
+    public float upperRange = 8f;
+    public float lowerRange = 5f;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-
+        fallSpeed = Random.Range(lowerRange, upperRange);
     }
 
     // Update is called once per frame

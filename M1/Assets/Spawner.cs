@@ -5,7 +5,7 @@ public class Spawner : MonoBehaviour
 
     public GameObject fallingObjectPrefab;
 
-    float spawnInterval = 1f;
+    float spawnInterval = 0.5f;
     float timer = 0f;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()

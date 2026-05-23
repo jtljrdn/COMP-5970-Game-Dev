@@ -105,6 +105,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 21c1b548bb2969b48888a71ccfda8a58, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FallingObject
+  upperRange: 10
+  lowerRange: 3
 --- !u!58 &4326646951709856477
 CircleCollider2D:
   m_ObjectHideFlags: 0
