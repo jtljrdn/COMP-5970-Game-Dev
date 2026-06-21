@@ -1,0 +1,65 @@
+# Unity .gitattributes
+# Prevents binary file corruption across different OS/Git configurations
+
+# Image formats
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.psd binary
+*.tga binary
+*.tif binary
+*.tiff binary
+*.ico binary
+
+# Audio
+*.mp3 binary
+*.wav binary
+*.ogg binary
+*.aif binary
+*.aiff binary
+
+# Video
+*.mp4 binary
+*.mov binary
+*.avi binary
+
+# Unity binary formats
+*.unity binary
+*.prefab binary
+*.mat binary
+*.asset binary
+*.anim binary
+*.controller binary
+*.overrideController binary
+*.physicMaterial binary
+*.physicsMaterial2D binary
+*.playable binary
+*.mesh binary
+*.mixer binary
+*.flare binary
+*.fontsettings binary
+*.guiskin binary
+*.shadervariants binary
+*.spriteatlas binary
+*.renderTexture binary
+*.cubemap binary
+*.lighting binary
+
+# Font files
+*.ttf binary
+*.otf binary
+
+# Text files - normalize line endings
+*.cs text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.xml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.txt text eol=lf
+*.md text eol=lf
+*.shader text eol=lf
+*.cginc text eol=lf
+*.hlsl text eol=lf

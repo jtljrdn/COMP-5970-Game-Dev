@@ -67,6 +67,6 @@
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "M4.slnx",
+    "dotnet.defaultSolution": "M5.slnx",
     "dotnet.enableWorkspaceBasedDevelopment": false
 }
