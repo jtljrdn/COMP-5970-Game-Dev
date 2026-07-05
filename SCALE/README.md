@@ -14,10 +14,9 @@ Shrink/Expand - Q/E
 
 Pickup/Drop - F
 
-
 ## Objective
 
-Your objective is to find your way out of the test chamber using the S.C.A.L.E. tool and the cubes around the demo area.
+The objective during Checkpoint 1 is to simply escape from the test chamber you are currently in. There is currently 1 level to show off the main physics and mechanics of the game, but future levels will have unique objects to interact with and additional mechanics to add difficulty and unique challenges.
 
 ## Assets and Attribution
 
