@@ -23,7 +23,9 @@ In Checkpoint 2, the objective is to solve the puzzles for the two test chambers
 - Basic levels -- final deliverable will include multiple levels with different mechanics.
 - Lack of first person HUD -- Need to add model for S.C.A.L.E. device
 - Little instruction -- Will add contextual hints on pickup and scaling items to first level to teach mechanics.
-- Levels thrown together -- Alot of the meshes for the levels are poorly made.
+- Levels thrown together -- Alot of the meshes for the levels are poorly made. Final version will have more polished levels.
+- Scaling is still a little janky -- Box can get stuck in you
+- Softlocking is possible
 
 ## Assets and Attribution
 
@@ -32,3 +34,7 @@ In Checkpoint 2, the objective is to solve the puzzles for the two test chambers
 - <https://assetstore.unity.com/packages/2d/gui/universal-stylized-ui-270506>
 - <https://assetstore.unity.com/packages/p/gridbox-prototype-materials-129127>
 - <https://assetstore.unity.com/packages/essentials/starter-assets-firstperson-urp-196525>
+- <https://polyhaven.com/a/WetFloorSign_01>
+- <https://assetstore.unity.com/packages/p/simple-water-shader-urp-191449>
+- <https://assetstore.unity.com/packages/p/footsteps-essentials-189879>
+- <https://assetstore.unity.com/packages/p/modern-led-lighting-pack-340786>
