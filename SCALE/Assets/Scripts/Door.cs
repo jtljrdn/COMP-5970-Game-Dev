@@ -40,7 +40,7 @@ public class Door : MonoBehaviour
         {
             if (GameManager.Instance != null)
             {
-                GameManager.Instance.GameOver();
+                GameManager.Instance.LevelComplete();
             }
             Debug.Log("Player entered the door trigger!");
         }

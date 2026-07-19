@@ -1,13 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// The core mechanic. Put this on the player. Every frame it casts a ray from the
-// centre of the camera; if it hits a Scalable object within range, holding the
-// grow/shrink keys (or scrolling the mouse wheel) resizes it.
-//
-// Input is handled through the new Input System via InputActions defined in code,
-// so it needs no wiring in the Input Actions editor and stays independent of the
-// shared StarterAssets input map.
 public class ScaleTool : MonoBehaviour
 {
     [Header("Aiming")]
@@ -38,8 +31,17 @@ public class ScaleTool : MonoBehaviour
     [Tooltip("How far in front of the camera a held object floats.")]
     public float holdDistance = 2.5f;
 
+    [Tooltip("Closest a held object is allowed to come when something blocks the hold point.")]
+    public float minHoldDistance = 1f;
+
     [Tooltip("How snappily a held object follows the view. Higher = tighter, lower = floatier.")]
     public float followSharpness = 15f;
+
+    [Tooltip("Speed cap while carrying. Keeps a held object from being flung through thin geometry.")]
+    public float maxHoldSpeed = 12f;
+
+    [Tooltip("Turn-rate cap while carrying, in radians per second.")]
+    public float maxHoldAngularSpeed = 20f;
 
     [Tooltip("Gentle forward toss applied when dropping (only if the object uses gravity).")]
     public float dropForce = 2f;
@@ -53,11 +55,17 @@ public class ScaleTool : MonoBehaviour
 
     private InputAction pickupAction;
 
-    // Pickup state.
+
     private Scalable heldObject;
     private Rigidbody heldBody;
     private bool heldOriginalKinematic;
     private bool heldOriginalGravity;
+    private CollisionDetectionMode heldOriginalDetection;
+    private RigidbodyInterpolation heldOriginalInterpolation;
+
+    private Collider[] playerColliders;
+
+    private readonly RaycastHit[] holdHits = new RaycastHit[8];
 
     public bool IsHoldingObject => heldObject != null;
 
@@ -72,6 +80,8 @@ public class ScaleTool : MonoBehaviour
         {
             aimCamera = Camera.main;
         }
+
+        playerColliders = transform.root.GetComponentsInChildren<Collider>();
 
         // Hold E to grow, Q to shrink, resolved as a -1..1 axis.
         scaleAction = new InputAction("Scale", InputActionType.Value);
@@ -187,8 +197,13 @@ public class ScaleTool : MonoBehaviour
                 PickUp(Target);
             }
         }
+    }
 
-        if (IsHoldingObject)
+    private void FixedUpdate()
+    {
+        // Carrying is driven through the physics engine, so it belongs on the
+        // physics tick rather than the render frame.
+        if (IsHoldingObject && heldBody != null)
         {
             MoveHeldObject();
         }
@@ -204,9 +219,20 @@ public class ScaleTool : MonoBehaviour
             // Remember the object's real physics settings so we can restore them on drop.
             heldOriginalKinematic = heldBody.isKinematic;
             heldOriginalGravity = heldBody.useGravity;
-            heldBody.isKinematic = true;
+            heldOriginalDetection = heldBody.collisionDetectionMode;
+            heldOriginalInterpolation = heldBody.interpolation;
+
+            // The body stays dynamic while carried so the world still stops it.
+            // Gravity is off so it hovers, and continuous detection keeps it from
+            // tunnelling when swung quickly past thin geometry.
+            heldBody.isKinematic = false;
             heldBody.useGravity = false;
+            heldBody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            heldBody.interpolation = RigidbodyInterpolation.Interpolate;
         }
+
+        // A carried object shouldn't shove the person carrying it.
+        SetPlayerCollision(obj, false);
 
         Debug.Log("Picked up: " + obj.gameObject.name);
     }
@@ -214,19 +240,113 @@ public class ScaleTool : MonoBehaviour
     private void MoveHeldObject()
     {
         Transform cam = aimCamera.transform;
-        Vector3 targetPosition = cam.position + cam.forward * holdDistance;
+        Vector3 targetPosition = cam.position + cam.forward * ClearHoldDistance(cam);
 
-        float t = 1f - Mathf.Exp(-followSharpness * Time.deltaTime);
-        heldObject.transform.position = Vector3.Lerp(heldObject.transform.position, targetPosition, t);
-        heldObject.transform.rotation = Quaternion.Slerp(heldObject.transform.rotation, cam.rotation, t);
+        // Steering by velocity rather than writing the transform is what makes the
+        // object collide: the physics engine resolves the move instead of us
+        // teleporting through whatever happens to be in the way.
+        Vector3 toTarget = targetPosition - heldBody.position;
+        heldBody.linearVelocity = Vector3.ClampMagnitude(toTarget * followSharpness, maxHoldSpeed);
+
+        // Rotation is steered the same way, as angular velocity.
+        Quaternion difference = cam.rotation * Quaternion.Inverse(heldBody.rotation);
+        difference.ToAngleAxis(out float angle, out Vector3 axis);
+        if (angle > 180f)
+        {
+            angle -= 360f;
+        }
+
+        if (Mathf.Abs(angle) > 0.01f && axis.sqrMagnitude > 0.0001f && !float.IsInfinity(axis.x))
+        {
+            Vector3 spin = axis.normalized * (angle * Mathf.Deg2Rad * followSharpness);
+            heldBody.angularVelocity = Vector3.ClampMagnitude(spin, maxHoldAngularSpeed);
+        }
+        else
+        {
+            heldBody.angularVelocity = Vector3.zero;
+        }
+    }
+
+    // Pulls the hold point in when something solid sits between the camera and it,
+    // so walking up to a wall tucks the object in instead of grinding it against
+    // the geometry.
+    private float ClearHoldDistance(Transform cam)
+    {
+        float radius = HeldRadius();
+        int count = Physics.SphereCastNonAlloc(
+            cam.position, radius, cam.forward, holdHits, holdDistance, hitMask, QueryTriggerInteraction.Ignore);
+
+        float nearest = holdDistance;
+        for (int i = 0; i < count; i++)
+        {
+            Transform hit = holdHits[i].collider.transform;
+
+            // The object we're carrying and the player carrying it aren't obstacles.
+            if (hit.IsChildOf(heldObject.transform) || hit.IsChildOf(transform.root))
+            {
+                continue;
+            }
+
+            if (holdHits[i].distance < nearest)
+            {
+                nearest = holdHits[i].distance;
+            }
+        }
+
+        return Mathf.Max(minHoldDistance, nearest);
+    }
+
+    // Half the held object's largest dimension - it rotates with the view, so the
+    // widest axis is the one that has to clear.
+    private float HeldRadius()
+    {
+        Collider collider = heldObject.GetComponentInChildren<Collider>();
+        if (collider == null)
+        {
+            return 0.1f;
+        }
+
+        Vector3 extents = collider.bounds.extents;
+        return Mathf.Max(0.05f, Mathf.Max(extents.x, Mathf.Max(extents.y, extents.z)));
+    }
+
+    private void SetPlayerCollision(Scalable obj, bool enabled)
+    {
+        if (playerColliders == null || obj == null)
+        {
+            return;
+        }
+
+        Collider[] objectColliders = obj.GetComponentsInChildren<Collider>();
+        foreach (Collider playerCollider in playerColliders)
+        {
+            if (playerCollider == null)
+            {
+                continue;
+            }
+
+            foreach (Collider objectCollider in objectColliders)
+            {
+                if (objectCollider != null)
+                {
+                    Physics.IgnoreCollision(objectCollider, playerCollider, !enabled);
+                }
+            }
+        }
     }
 
     private void Drop()
     {
+        Scalable dropped = heldObject;
+
         if (heldBody != null)
         {
-            heldBody.isKinematic = heldOriginalKinematic;
+            // Detection mode has to go back before isKinematic: a kinematic body
+            // can't be left on ContinuousDynamic.
+            heldBody.collisionDetectionMode = heldOriginalDetection;
+            heldBody.interpolation = heldOriginalInterpolation;
             heldBody.useGravity = heldOriginalGravity;
+            heldBody.isKinematic = heldOriginalKinematic;
 
             // Give it a gentle push forward if it's a normal physics object.
             if (!heldBody.isKinematic)
@@ -235,7 +355,9 @@ public class ScaleTool : MonoBehaviour
             }
         }
 
-        Debug.Log("Dropped: " + heldObject.gameObject.name);
+        SetPlayerCollision(dropped, true);
+
+        Debug.Log("Dropped: " + dropped.gameObject.name);
         heldObject = null;
         heldBody = null;
     }
