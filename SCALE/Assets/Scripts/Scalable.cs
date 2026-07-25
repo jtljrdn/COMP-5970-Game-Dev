@@ -19,6 +19,11 @@ public class Scalable : MonoBehaviour
 
     public TextMeshPro debugText;
 
+    [Header("Tutorial")]
+    public bool isTutorialObject = false;
+    public bool isTutorialComplete = false;
+    public TextMeshPro tutorialText;
+
     private Rigidbody rb;
     private Collider bodyCollider;
     private Vector3 baseScale;
@@ -40,6 +45,7 @@ public class Scalable : MonoBehaviour
         }
 
         UpdateDebugText();
+        
     }
 
     public int ApplyScale(float delta)
