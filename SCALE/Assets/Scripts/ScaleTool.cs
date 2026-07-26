@@ -185,7 +185,6 @@ public class ScaleTool : MonoBehaviour
 
     private void HandlePickup()
     {
-        // F toggles: drop what we're holding, otherwise pick up what we're aiming at.
         if (pickupAction.triggered)
         {
             if (IsHoldingObject)
@@ -195,6 +194,7 @@ public class ScaleTool : MonoBehaviour
             else if (Target != null)
             {
                 PickUp(Target);
+                Target.CompleteTutorial();
             }
         }
     }
