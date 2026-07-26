@@ -46,8 +46,15 @@ public class ScaleTool : MonoBehaviour
     [Tooltip("Gentle forward toss applied when dropping (only if the object uses gravity).")]
     public float dropForce = 2f;
 
+    [Header("Interaction")]
+    [Tooltip("How close the player must be to press a button. Shorter than the scaling range so buttons can't be hit across the room.")]
+    public float interactRange = 3.5f;
+
     // The Scalable currently under the crosshair (null if none).
     public Scalable Target { get; private set; }
+
+    // The Interactable currently under the crosshair and within reach (null if none).
+    public Interactable InteractTarget { get; private set; }
 
     // Grow/shrink axis (+1 grow, -1 shrink) and the mouse wheel, as Input System actions.
     private InputAction scaleAction;
@@ -131,12 +138,21 @@ public class ScaleTool : MonoBehaviour
     private void UpdateTarget()
     {
         Scalable found = null;
+        Interactable interactable = null;
 
         Ray ray = aimCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
         if (Physics.Raycast(ray, out RaycastHit hit, range, hitMask, QueryTriggerInteraction.Ignore))
         {
             found = hit.collider.GetComponentInParent<Scalable>();
+
+            // A button's collider is usually a child of the object holding the script.
+            if (hit.distance <= interactRange)
+            {
+                interactable = hit.collider.GetComponentInParent<Interactable>();
+            }
         }
+
+        InteractTarget = interactable;
 
         if (found != highlighted)
         {
@@ -185,17 +201,27 @@ public class ScaleTool : MonoBehaviour
 
     private void HandlePickup()
     {
-        if (pickupAction.triggered)
+        if (!pickupAction.triggered)
         {
-            if (IsHoldingObject)
-            {
-                Drop();
-            }
-            else if (Target != null)
-            {
-                PickUp(Target);
-                Target.CompleteTutorial();
-            }
+            return;
+        }
+
+        // Aiming at something usable wins over carrying: pressing a button while
+        // holding a cube shouldn't fling the cube on the floor.
+        if (InteractTarget != null)
+        {
+            InteractTarget.Interact();
+            return;
+        }
+
+        if (IsHoldingObject)
+        {
+            Drop();
+        }
+        else if (Target != null)
+        {
+            PickUp(Target);
+            Target.CompleteTutorial();
         }
     }
 

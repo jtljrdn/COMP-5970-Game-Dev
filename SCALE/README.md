@@ -38,3 +38,5 @@ In Checkpoint 2, the objective is to solve the puzzles for the two test chambers
 - <https://assetstore.unity.com/packages/p/simple-water-shader-urp-191449>
 - <https://assetstore.unity.com/packages/p/footsteps-essentials-189879>
 - <https://assetstore.unity.com/packages/p/modern-led-lighting-pack-340786>
+- <https://pixabay.com/sound-effects/film-special-effects-single-key-press-393908/>
+- <https://github.com/omid3098/Unity-URP-GlassShader>
