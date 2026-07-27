@@ -32,5 +32,5 @@ Your objective is to make it through all 4 test chambers.
 
 ## Links
 
-[Itch.io](https://itch.io)
-[YouTube Video](https://itch.io)
+[Itch.io](https://jtljrdn.itch.io/scale)
+[YouTube Video](https://youtu.be/uYSTwGLYRVE)
