@@ -37,6 +37,11 @@ public class Scalable : MonoBehaviour
     [Tooltip("Seconds the tutorial text takes to fade from visible to invisible.")]
     public float tutorialFadeTime = 1f;
 
+    private static readonly Vector3[] Directions =
+    {
+        Vector3.up, Vector3.down, Vector3.right, Vector3.left, Vector3.forward, Vector3.back,
+    };
+
     private Rigidbody rb;
     private Collider bodyCollider;
     private Vector3 baseScale;
@@ -44,8 +49,17 @@ public class Scalable : MonoBehaviour
     private float factor = 1f;
 
     private readonly Collider[] overlapBuffer = new Collider[16];
+    private readonly Collider[] probeBuffer = new Collider[16];
+
+    private bool separationImpossible;
+    private Collider[] carrier;
 
     public bool IsGrowthBlocked { get; private set; }
+
+    public void SetCarrier(Collider[] colliders)
+    {
+        carrier = colliders;
+    }
 
     private void Awake()
     {
@@ -63,7 +77,6 @@ public class Scalable : MonoBehaviour
         }
 
         UpdateDebugText();
-
     }
 
     public int ApplyScale(float delta)
@@ -85,11 +98,8 @@ public class Scalable : MonoBehaviour
         transform.localScale = baseScale * factor;
         Physics.SyncTransforms();
 
-        // Growing always digs the object into whatever it is resting on, so
-        // refusing on contact would leave anything sat on the floor permanently
-        // stuck. Instead we grow first and then shove the object clear, and only
-        // give up when it is genuinely boxed in. Shrinking can never create a
-        // new overlap, so it skips the whole dance.
+        // Grow first and shove clear afterwards, so resting on the floor doesn't
+        // count as being blocked. Shrinking can't create an overlap.
         if (applied > 0f && !ResolveOverlap())
         {
             factor = previous;
@@ -107,8 +117,6 @@ public class Scalable : MonoBehaviour
         {
             rb.mass = baseMass * factor;
 
-            // A body that had already fallen asleep on the floor won't re-settle
-            // against its new size on its own.
             if (!rb.isKinematic)
             {
                 rb.WakeUp();
@@ -120,10 +128,6 @@ public class Scalable : MonoBehaviour
         return applied > 0f ? 1 : -1;
     }
 
-    // Pushes the object out of everything it currently intersects. Runs several
-    // passes so that a corner (floor plus wall) settles instead of the two
-    // surfaces fighting each other. Returns false if the object cannot be freed
-    // within maxGrowthPush.
     private bool ResolveOverlap()
     {
         if (bodyCollider == null)
@@ -136,6 +140,11 @@ public class Scalable : MonoBehaviour
         for (int pass = 0; pass < growthResolvePasses; pass++)
         {
             Vector3 push = ComputeSeparation();
+            if (separationImpossible)
+            {
+                return false;
+            }
+
             if (push == Vector3.zero)
             {
                 return true;
@@ -150,89 +159,140 @@ public class Scalable : MonoBehaviour
             }
         }
 
-        return ComputeSeparation() == Vector3.zero;
+        return ComputeSeparation() == Vector3.zero && !separationImpossible;
     }
 
-    // The offset that would separate this object from everything it overlaps.
     private Vector3 ComputeSeparation()
     {
+        separationImpossible = false;
+
         Bounds bounds = bodyCollider.bounds;
+        Transform body = bodyCollider.transform;
+        Vector3 push = Vector3.zero;
+
         int count = Physics.OverlapBoxNonAlloc(
             bounds.center, bounds.extents, overlapBuffer,
             Quaternion.identity, blockingMask, QueryTriggerInteraction.Ignore);
-
-        Transform body = bodyCollider.transform;
-        Vector3 push = Vector3.zero;
 
         for (int i = 0; i < count; i++)
         {
             Collider hit = overlapBuffer[i];
 
-            if (hit == null || hit.transform.IsChildOf(transform) || hit.CompareTag("Player"))
+            if (hit == null || hit.transform.IsChildOf(transform) || hit.CompareTag("Player") || IsWater(hit))
             {
                 continue;
             }
 
-            if (SupportsPenetration(hit))
+            // ComputePenetration can't take a concave mesh, which is what the
+            // greybox level is built from.
+            push += hit is MeshCollider { convex: false } ? EscapeCollider(hit) : Penetration(hit, body);
+        }
+
+        // The carrier's collision with this is switched off and its layer is
+        // outside blockingMask, so it never shows up in the query above.
+        if (carrier != null)
+        {
+            foreach (Collider held in carrier)
             {
-                if (Physics.ComputePenetration(
-                        bodyCollider, body.position, body.rotation,
-                        hit, hit.transform.position, hit.transform.rotation,
-                        out Vector3 direction, out float distance))
+                if (held != null && held is not CharacterController && !held.transform.IsChildOf(transform))
                 {
-                    // Resting bodies always sit a sliver inside the floor, so
-                    // shallow contact is left alone and only real intersection
-                    // gets pushed out.
-                    float depth = distance - growthSkin;
-                    if (depth > 0f)
-                    {
-                        push += direction * depth;
-                    }
+                    push += Penetration(held, body);
                 }
-            }
-            else
-            {
-                push += SeparateBounds(bounds, hit.bounds);
             }
         }
 
         return push;
     }
 
-    // ComputePenetration cannot handle non-convex mesh colliders, which is what
-    // greybox level geometry is built from.
-    private static bool SupportsPenetration(Collider collider)
+    private Vector3 Penetration(Collider other, Transform body)
     {
-        return collider is not MeshCollider mesh || mesh.convex;
+        if (Physics.ComputePenetration(
+                bodyCollider, body.position, body.rotation,
+                other, other.transform.position, other.transform.rotation,
+                out Vector3 direction, out float distance)
+            && distance > growthSkin)
+        {
+            return direction * (distance - growthSkin);
+        }
+
+        return Vector3.zero;
     }
 
-    // Fallback for those mesh colliders: the shortest move that pulls one box
-    // out of the other. Level geometry is axis-aligned slabs, so the shallowest
-    // axis is reliably the one to back out along - a crate on a wide floor
-    // overlaps it barely in Y and hugely in X and Z, so it gets pushed up.
-    private Vector3 SeparateBounds(Bounds self, Bounds other)
+    // A concave mesh's bounding box is mostly fresh air - the chamber floor is one
+    // 4.5m slab with the pool carved out of it - so the way out has to be measured
+    // against the real triangles: step along each axis and keep the shortest move
+    // that comes free.
+    private Vector3 EscapeCollider(Collider hit)
     {
-        Vector3 delta = self.center - other.center;
-        Vector3 overlap = self.extents + other.extents
-            - new Vector3(Mathf.Abs(delta.x), Mathf.Abs(delta.y), Mathf.Abs(delta.z))
-            - Vector3.one * growthSkin;
+        Bounds bounds = bodyCollider.bounds;
+        Vector3 probe = Vector3.Max(bounds.extents - Vector3.one * growthSkin, Vector3.one * 0.001f);
 
-        if (overlap.x <= 0f || overlap.y <= 0f || overlap.z <= 0f)
+        if (!Touches(bounds.center, probe, hit))
         {
             return Vector3.zero;
         }
 
-        if (overlap.y <= overlap.x && overlap.y <= overlap.z)
+        Vector3 best = Vector3.zero;
+        float shortest = float.MaxValue;
+
+        foreach (Vector3 direction in Directions)
         {
-            return new Vector3(0f, Mathf.Sign(delta.y) * overlap.y, 0f);
+            if (Touches(bounds.center + direction * maxGrowthPush, probe, hit))
+            {
+                continue;
+            }
+
+            float stuck = 0f;
+            float free = maxGrowthPush;
+            for (int step = 0; step < 6; step++)
+            {
+                float middle = (stuck + free) * 0.5f;
+                if (Touches(bounds.center + direction * middle, probe, hit))
+                {
+                    stuck = middle;
+                }
+                else
+                {
+                    free = middle;
+                }
+            }
+
+            if (free < shortest)
+            {
+                shortest = free;
+                best = direction * free;
+            }
         }
 
-        if (overlap.x <= overlap.z)
+        if (shortest == float.MaxValue)
         {
-            return new Vector3(Mathf.Sign(delta.x) * overlap.x, 0f, 0f);
+            separationImpossible = true;
         }
 
-        return new Vector3(0f, 0f, Mathf.Sign(delta.z) * overlap.z);
+        return best;
+    }
+
+    private bool Touches(Vector3 centre, Vector3 extents, Collider collider)
+    {
+        int count = Physics.OverlapBoxNonAlloc(
+            centre, extents, probeBuffer,
+            Quaternion.identity, blockingMask, QueryTriggerInteraction.Ignore);
+
+        for (int i = 0; i < count; i++)
+        {
+            if (probeBuffer[i] == collider)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsWater(Collider collider)
+    {
+        return collider.GetComponentInParent<Water>(true) != null
+            || collider.gameObject.layer == LayerMask.NameToLayer("Water");
     }
 
     private void UpdateDebugText()

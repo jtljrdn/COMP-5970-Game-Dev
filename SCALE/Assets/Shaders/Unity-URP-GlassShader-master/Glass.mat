@@ -72,9 +72,9 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReflectionStrenght: 0.05
-    - _ReflectionStrength: 2.37
+    - _ReflectionStrength: 0.58
     - _RefractionStrenght: 1.15
-    - _Smoothness: 1
+    - _Smoothness: 0.188
     - _Strenght: 0.12
     - _Tiling: 34
     m_Colors:

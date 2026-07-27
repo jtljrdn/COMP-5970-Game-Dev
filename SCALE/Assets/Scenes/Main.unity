@@ -690,9 +690,10 @@ MonoBehaviour:
   scrollStep: 0.25
   scaleAudio: {fileID: 2138072850}
   highlightColor: {r: 1, g: 0.85, b: 0.3, a: 1}
-  holdDistance: 2.5
+  holdDistance: 3
   minHoldDistance: 1
-  followSharpness: 15
+  holdClearance: 1
+  followSharpness: 10
   maxHoldSpeed: 12
   maxHoldAngularSpeed: 20
   dropForce: 2
@@ -15907,7 +15908,7 @@ PrefabInstance:
       objectReference: {fileID: 1652205921}
     - target: {fileID: 7957226560407384202, guid: 2049c5f63a9b9da43983d48cb6802d35, type: 3}
       propertyPath: m_VersionIndex
-      value: 5444
+      value: 5450
       objectReference: {fileID: 0}
     - target: {fileID: 9171829815653124996, guid: 2049c5f63a9b9da43983d48cb6802d35, type: 3}
       propertyPath: m_Mesh
@@ -16607,6 +16608,7 @@ MonoBehaviour:
   completeMessage: CHAMBER CLEARED
   deathMessage: SUBJECT TERMINATED
   chamberSceneNames:
+  - Chamber_4
   - Chamber_3
   - Chamber_2
   - Chamber_1
@@ -22741,7 +22743,7 @@ PrefabInstance:
       objectReference: {fileID: 1612856592}
     - target: {fileID: 7957226560407384202, guid: 2049c5f63a9b9da43983d48cb6802d35, type: 3}
       propertyPath: m_VersionIndex
-      value: 5444
+      value: 5450
       objectReference: {fileID: 0}
     - target: {fileID: 9171829815653124996, guid: 2049c5f63a9b9da43983d48cb6802d35, type: 3}
       propertyPath: m_Mesh
@@ -23466,7 +23468,7 @@ PrefabInstance:
       objectReference: {fileID: 899537558}
     - target: {fileID: 7957226560407384202, guid: 2049c5f63a9b9da43983d48cb6802d35, type: 3}
       propertyPath: m_VersionIndex
-      value: 5444
+      value: 5450
       objectReference: {fileID: 0}
     - target: {fileID: 9171829815653124996, guid: 2049c5f63a9b9da43983d48cb6802d35, type: 3}
       propertyPath: m_Mesh
@@ -26738,7 +26740,7 @@ PrefabInstance:
       objectReference: {fileID: 1778982508}
     - target: {fileID: 7957226560407384202, guid: 2049c5f63a9b9da43983d48cb6802d35, type: 3}
       propertyPath: m_VersionIndex
-      value: 5444
+      value: 5450
       objectReference: {fileID: 0}
     - target: {fileID: 9171829815653124996, guid: 2049c5f63a9b9da43983d48cb6802d35, type: 3}
       propertyPath: m_Mesh
@@ -27192,7 +27194,7 @@ PrefabInstance:
       objectReference: {fileID: 1001886910}
     - target: {fileID: 7957226560407384202, guid: 2049c5f63a9b9da43983d48cb6802d35, type: 3}
       propertyPath: m_VersionIndex
-      value: 5444
+      value: 5450
       objectReference: {fileID: 0}
     - target: {fileID: 9171829815653124996, guid: 2049c5f63a9b9da43983d48cb6802d35, type: 3}
       propertyPath: m_Mesh

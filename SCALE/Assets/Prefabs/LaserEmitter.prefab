@@ -368,7 +368,7 @@ MonoBehaviour:
   m_PreserveMeshAssetOnDestroy: 0
   assetGuid: 
   m_Mesh: {fileID: 0}
-  m_VersionIndex: 5408
+  m_VersionIndex: 5447
   m_IsSelectable: 1
   m_SelectedFaces: 
   m_SelectedEdges: []
@@ -521,7 +521,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 76f6a2446477b9b48ae4f755dd33ce5a, type: 3}
   m_PlayOnAwake: 1
-  m_Volume: 0.168
+  m_Volume: 0.052
   m_Pitch: 1.47
   Loop: 1
   Mute: 0
@@ -795,7 +795,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: db8cba0c8cb9bbb4f96425ea08ae2e8b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LaserBeam
-  maxRange: 30
+  maxRange: 9
   beamRadius: 0.05
   originOffset: 0.02
   blockingMask:
@@ -803,11 +803,11 @@ MonoBehaviour:
     m_Bits: 4294967295
   killsPlayer: 1
   onDuration: 2
-  offDuration: 0
+  offDuration: 1
   beam: {fileID: 4387042518547078646}
   impactGlow: {fileID: 48191247035957089}
   humAudio: {fileID: 0}
-  zapClip: {fileID: 0}
+  zapClip: {fileID: 8300000, guid: 472fd2e31348557408fe22b374a4d42e, type: 3}
   gizmoColor: {r: 1, g: 0.2, b: 0.2, a: 0.8}
 --- !u!1 &6995071209876906661
 GameObject:

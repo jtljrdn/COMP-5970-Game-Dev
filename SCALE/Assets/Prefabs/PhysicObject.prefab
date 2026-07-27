@@ -132,9 +132,15 @@ MonoBehaviour:
   maxFactor: 3
   blockingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 743
   growthSkin: 0.03
+  maxGrowthPush: 1.5
+  growthResolvePasses: 4
   debugText: {fileID: 2239233835046074273}
+  isTutorialObject: 0
+  tutorialText: {fileID: 0}
+  tutorialHoldTime: 2
+  tutorialFadeTime: 1
 --- !u!54 &8903491861648442088
 Rigidbody:
   m_ObjectHideFlags: 0

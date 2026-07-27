@@ -34,6 +34,9 @@ public class ScaleTool : MonoBehaviour
     [Tooltip("Closest a held object is allowed to come when something blocks the hold point.")]
     public float minHoldDistance = 1f;
 
+    [Tooltip("Gap kept between the camera and the near face of a held object. A growing object is pushed further out rather than being allowed to swallow the player. Keep this above the player capsule's radius.")]
+    public float holdClearance = 0.75f;
+
     [Tooltip("How snappily a held object follows the view. Higher = tighter, lower = floatier.")]
     public float followSharpness = 15f;
 
@@ -257,8 +260,11 @@ public class ScaleTool : MonoBehaviour
             heldBody.interpolation = RigidbodyInterpolation.Interpolate;
         }
 
-        // A carried object shouldn't shove the person carrying it.
+        // A carried object shouldn't shove the person carrying it. Collision with
+        // the player is off, so growing it has to make room against the player
+        // itself rather than relying on the physics engine to keep them apart.
         SetPlayerCollision(obj, false);
+        obj.SetCarrier(playerColliders);
 
         Debug.Log("Picked up: " + obj.gameObject.name);
     }
@@ -299,10 +305,20 @@ public class ScaleTool : MonoBehaviour
     private float ClearHoldDistance(Transform cam)
     {
         float radius = HeldRadius();
-        int count = Physics.SphereCastNonAlloc(
-            cam.position, radius, cam.forward, holdHits, holdDistance, hitMask, QueryTriggerInteraction.Ignore);
 
-        float nearest = holdDistance;
+        // A big object has to float further out than a small one: the hold point
+        // is its centre, so once it is scaled up past the hold distance its near
+        // face reaches back past the camera and the player is stood inside it.
+        // This distance is the floor as well as the target - an obstruction can
+        // pull the object in, but never closer than its own size allows.
+        float safeDistance = radius + holdClearance;
+        float desired = Mathf.Max(holdDistance, safeDistance);
+        float floor = Mathf.Max(minHoldDistance, safeDistance);
+
+        int count = Physics.SphereCastNonAlloc(
+            cam.position, radius, cam.forward, holdHits, desired, hitMask, QueryTriggerInteraction.Ignore);
+
+        float nearest = desired;
         for (int i = 0; i < count; i++)
         {
             Transform hit = holdHits[i].collider.transform;
@@ -313,13 +329,22 @@ public class ScaleTool : MonoBehaviour
                 continue;
             }
 
+            // A cast sphere this wide is already touching the floor the player is
+            // stood on before it has travelled anywhere, which reports as a hit at
+            // zero distance. That means the probe is too fat to fit, not that
+            // something is in the way, so it must not drag the object inwards.
+            if (holdHits[i].distance <= 0f)
+            {
+                continue;
+            }
+
             if (holdHits[i].distance < nearest)
             {
                 nearest = holdHits[i].distance;
             }
         }
 
-        return Mathf.Max(minHoldDistance, nearest);
+        return Mathf.Max(floor, nearest);
     }
 
     // Half the held object's largest dimension - it rotates with the view, so the
@@ -382,6 +407,7 @@ public class ScaleTool : MonoBehaviour
         }
 
         SetPlayerCollision(dropped, true);
+        dropped.SetCarrier(null);
 
         Debug.Log("Dropped: " + dropped.gameObject.name);
         heldObject = null;
