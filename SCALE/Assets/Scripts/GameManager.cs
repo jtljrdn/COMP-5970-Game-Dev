@@ -4,10 +4,6 @@ using TMPro;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
 
-// Chambers are separate scenes loaded additively on top of this one rather than
-// prefabs instantiated at runtime. That is what lets them keep baked lighting:
-// lightmaps are bound per scene (each renderer stores an index into the scene's
-// lightmap array), and that binding cannot survive being saved into a prefab.
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
@@ -34,7 +30,18 @@ public class GameManager : MonoBehaviour
     [Tooltip("Name of the object inside each chamber scene marking where the player appears.")]
     public string spawnPointName = "SpawnPoint";
 
+    [Header("Loading")]
+    [Tooltip("Optional. One is built at runtime when this is left empty.")]
+    public LoadingScreen loadingScreen;
+
+    [Tooltip("Seconds the opening fade from black takes.")]
+    public float startFadeDuration = 1f;
+
+    [Tooltip("Seconds the fade back in takes once a chamber has loaded.")]
+    public float chamberFadeDuration = 0.35f;
+
     private CharacterController playerController;
+    private ScaleTool playerScaleTool;
     private int currentLevelIndex = -1;
 
     // The scene this GameManager lives in. It stays loaded for the whole run and
@@ -60,8 +67,6 @@ public class GameManager : MonoBehaviour
 
         Instance = this;
 
-        // Captured as a name rather than a Scene handle: Restart reloads it in Single
-        // mode, after which any previously held handle is meaningless.
         bootstrapSceneName = gameObject.scene.name;
 
         restartAction = new InputAction("Restart", InputActionType.Button, "<Keyboard>/r");
@@ -69,7 +74,17 @@ public class GameManager : MonoBehaviour
         if (player != null)
         {
             playerController = player.GetComponentInChildren<CharacterController>();
+            playerScaleTool = player.GetComponentInChildren<ScaleTool>();
         }
+
+        if (loadingScreen == null)
+        {
+            loadingScreen = LoadingScreen.Build(transform);
+        }
+
+        // Black from the very first frame, so the empty bootstrap scene is never
+        // on screen while chamber one loads.
+        loadingScreen.Cover(false);
     }
 
     private void OnEnable()
@@ -137,20 +152,22 @@ public class GameManager : MonoBehaviour
         StartCoroutine(SwitchChamber(next));
     }
 
-    // Unloads whatever chamber is loaded and brings up the requested one. Kept as a
-    // coroutine because scene loading is inherently async - trying to do this in one
-    // frame would mean the old chamber's colliders are still live when the player is
-    // teleported into the new one.
     private IEnumerator SwitchChamber(int index)
     {
         isSwitching = true;
 
-        // Between unload and load there is no floor anywhere, so freeze the controller
-        // rather than let the player fall through empty space for those frames.
+        // The opening load is already behind a black screen from Awake. A swap
+        // mid-run covers the screen and pauses instead, so the few frames with no
+        // chamber in the world are never seen or played through.
+        bool firstLoad = currentLevelIndex < 0;
+        if (!firstLoad)
+        {
+            loadingScreen.Cover(true);
+            Time.timeScale = 0f;
+        }
+
         SetPlayerSuspended(true);
 
-        // The active scene supplies ambient, fog and skybox, and it must never be the
-        // scene being unloaded - hand that role back to the bootstrap scene first.
         Scene bootstrap = SceneManager.GetSceneByName(bootstrapSceneName);
         if (bootstrap.IsValid() && bootstrap.isLoaded)
         {
@@ -170,24 +187,35 @@ public class GameManager : MonoBehaviour
         {
             Debug.LogError($"GameManager: chamber scene '{sceneName}' failed to load. " +
                            "Check the name matches the scene asset and that it is listed in Build Settings.");
-            SetPlayerSuspended(false);
+            Resume();
             isSwitching = false;
+            yield return loadingScreen.Reveal(chamberFadeDuration);
             yield break;
         }
 
         AdoptChamber(chamber, index);
 
-        SetPlayerSuspended(false);
+        yield return null;
+
+        Resume();
         isSwitching = false;
+
+        yield return loadingScreen.Reveal(firstLoad ? startFadeDuration : chamberFadeDuration);
     }
 
-    // Takes ownership of an already-loaded chamber scene: makes it active, moves the
-    // player to its spawn point and updates the HUD. Shared by the load path and the
-    // preloaded path so both behave identically.
+    private void Resume()
+    {
+        SetPlayerSuspended(false);
+
+        // Game over does its own pausing and must not be undone here.
+        if (!isGameOver)
+        {
+            Time.timeScale = 1f;
+        }
+    }
+
     private void AdoptChamber(Scene chamber, int index)
     {
-        // Making the chamber active is what puts its baked environment lighting in
-        // charge; its lightmaps are merged into the global array by the load itself.
         SceneManager.SetActiveScene(chamber);
         loadedChamber = chamber;
         currentLevelIndex = index;
@@ -206,10 +234,15 @@ public class GameManager : MonoBehaviour
         {
             playerController.enabled = !suspended;
         }
+
+        // Timescale alone wouldn't stop this one: it works off Update and would
+        // let the player grab and scale things through the loading screen.
+        if (playerScaleTool != null)
+        {
+            playerScaleTool.enabled = !suspended;
+        }
     }
 
-    // Searches the loaded chamber for the spawn marker. This has to look at the loaded
-    // scene rather than a prefab asset - an asset's transform is not a place in the world.
     private Transform FindSpawnPoint(Scene scene)
     {
         foreach (GameObject root in scene.GetRootGameObjects())
@@ -284,6 +317,13 @@ public class GameManager : MonoBehaviour
         SceneManager.LoadScene(bootstrapSceneName, LoadSceneMode.Single);
     }
 
+
+    private void Quit()
+    {
+        Debug.Log("Quitting game.");
+        Application.Quit();
+    }
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -300,6 +340,7 @@ public class GameManager : MonoBehaviour
         if (chamberSceneNames == null || chamberSceneNames.Length == 0)
         {
             Debug.LogWarning("GameManager: chamberSceneNames is empty - no chambers will load.");
+            StartCoroutine(loadingScreen.Reveal(startFadeDuration));
             return;
         }
 
@@ -311,6 +352,7 @@ public class GameManager : MonoBehaviour
         if (preloaded.IsValid() && preloaded.isLoaded)
         {
             AdoptChamber(preloaded, 0);
+            StartCoroutine(loadingScreen.Reveal(startFadeDuration));
         }
         else
         {
@@ -326,6 +368,11 @@ public class GameManager : MonoBehaviour
         if (isGameOver && restartAction.triggered)
         {
             Restart();
+        }
+
+        if (Keyboard.current.escapeKey.wasPressedThisFrame)
+        {
+            Quit();
         }
     }
 }
